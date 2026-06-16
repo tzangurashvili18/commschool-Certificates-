@@ -31,7 +31,8 @@ register_fonts()
 
 PAGE_W, PAGE_H = 595.276, 841.89
 DPI = 200; SCALE = DPI / 72.0
-GREEN = (48, 177, 66); BLACK = (0, 0, 0); RIGHT = 541
+GREEN = (5, 172, 76)       # Digital version: #05AC4C
+PRINT_GREEN = (17, 171, 75)  # Print version:   #11AB4B; BLACK = (0, 0, 0); RIGHT = 541
 SIG_P1 = (1213, 1534, 1497, 1819)
 SIG_P2 = (1232, 1535, 1517, 1819)
 
@@ -71,9 +72,10 @@ def make_cert(name_eng, name_geo, course_eng, course_geo, date, crash, print_ver
     imgs = convert_from_bytes(TEMPLATE_BYTES, dpi=DPI)
     writer = PdfWriter(); rp = pt_to_px(RIGHT)
     img = imgs[0].copy(); d = ImageDraw.Draw(img)
-    d.rectangle([pt_to_px(120), pt_to_px(390), pt_to_px(548), pt_to_px(515)], fill=GREEN)
-    d.rectangle([pt_to_px(55),  pt_to_px(636), pt_to_px(235), pt_to_px(664)], fill=GREEN)
-    if print_version: d.rectangle(list(SIG_P1), fill=GREEN)
+    _g = PRINT_GREEN if print_version else GREEN
+    d.rectangle([pt_to_px(120), pt_to_px(390), pt_to_px(548), pt_to_px(515)], fill=_g)
+    d.rectangle([pt_to_px(55),  pt_to_px(636), pt_to_px(235), pt_to_px(664)], fill=_g)
+    if print_version: d.rectangle(list(SIG_P1), fill=_g)
     gr=pil_font("GeoReg",15); gb=pil_font("GeoBold",15)
     lr=pil_font("LatReg",12); lb=pil_font("LatBold",15); lh=pt_to_px(23)
     y1=pt_to_px(400); y2=y1+lh; y3=y2+lh
@@ -82,23 +84,37 @@ def make_cert(name_eng, name_geo, course_eng, course_geo, date, crash, print_ver
         draw_ra(d, y2, [('"', lb)]+mixed_parts(course_geo, gb, lb)+[('"', lb)], rp)
         draw_ra(d, y3, [("ქრეშ კურსის წარმატებით დასრულებისთვის", gr)], rp)
     else:
-        draw_ra(d, y2, mixed_parts(course_geo, gb, lb)+[("პროგრამის", gr)], rp)
+        draw_ra(d, y2, mixed_parts(course_geo, gb, lb)+[(" პროგრამის", gr)], rp)
         draw_ra(d, y3, [("წარმატებით დასრულებისთვის", gr)], rp)
     d.text((pt_to_px(57.9), pt_to_px(644)), date, fill=BLACK, font=lr)
     writer.add_page(img_to_page(img))
     img2=imgs[1].copy(); d2=ImageDraw.Draw(img2)
-    d2.rectangle([pt_to_px(200), pt_to_px(395), pt_to_px(548), pt_to_px(510)], fill=GREEN)
-    d2.rectangle([pt_to_px(55),  pt_to_px(636), pt_to_px(235), pt_to_px(664)], fill=GREEN)
-    if print_version: d2.rectangle(list(SIG_P2), fill=GREEN)
+    d2.rectangle([pt_to_px(200), pt_to_px(395), pt_to_px(548), pt_to_px(510)], fill=_g)
+    d2.rectangle([pt_to_px(55),  pt_to_px(636), pt_to_px(235), pt_to_px(664)], fill=_g)
+    if print_version: d2.rectangle(list(SIG_P2), fill=_g)
     r19=pil_font("LatReg",19); b19=pil_font("LatBold",19); r12=pil_font("LatReg",12)
     off=int(19*DPI/72)
+    _tmp=Image.new("RGB",(10,10)); _td=ImageDraw.Draw(_tmp)
     draw_ra(d2, pt_to_px(419)-off, [("Is presented to ", r19),(name_eng, b19)], rp)
     draw_ra(d2, pt_to_px(441)-off, [("for successfully completing", r19)], rp)
     if crash:
-        draw_ra(d2, pt_to_px(463)-off, [("the crash course", r19)], rp)
-        draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, b19),('"', r19)], rp)
+        _w = _td.textlength('"'+course_eng+'"', font=b19)
+        if _td.textlength("the crash course", font=r19) + _w <= rp:
+            draw_ra(d2, pt_to_px(463)-off, [("the crash course", r19)], rp)
+            draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, b19),('"', r19)], rp)
+        else:
+            draw_ra(d2, pt_to_px(463)-off, [("the crash course", r19)], rp)
+            draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, b19),('"', r19)], rp)
     else:
-        draw_ra(d2, pt_to_px(463)-off, [("the course of ", r19),(course_eng, b19)], rp)
+        _prefix_w = _td.textlength("the course of ", font=r19)
+        _course_w = _td.textlength(course_eng, font=b19)
+        if _prefix_w + _course_w <= rp:
+            # Fits on one line
+            draw_ra(d2, pt_to_px(463)-off, [("the course of ", r19),(course_eng, b19)], rp)
+        else:
+            # Split: "the course of" on line 3, course name on line 4
+            draw_ra(d2, pt_to_px(463)-off, [("the course of", r19)], rp)
+            draw_ra(d2, pt_to_px(485)-off, [(course_eng, b19)], rp)
     d2.text((pt_to_px(58.4), pt_to_px(644)), date, fill=BLACK, font=r12)
     writer.add_page(img_to_page(img2))
     out=io.BytesIO(); writer.write(out); return out.getvalue()
@@ -118,7 +134,7 @@ def make_video(name_eng, name_geo, course_eng, course_geo, date, crash):
         eng_c1 = "the crash course"
         eng_c2 = f'"{course_eng}"'
     else:
-        geo_c1 = f"{course_geo}-ის პროგრამის"
+        geo_c1 = f"{course_geo} პროგრამის"
         geo_c2 = "წარმატებით დასრულებისთვის"
         eng_c1 = "for successfully completing the"
         eng_c2 = f"course of {course_eng}"
