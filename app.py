@@ -32,7 +32,9 @@ register_fonts()
 PAGE_W, PAGE_H = 595.276, 841.89
 DPI = 200; SCALE = DPI / 72.0
 GREEN = (5, 172, 76)       # Digital version: #05AC4C
-PRINT_GREEN = (17, 171, 75)  # Print version:   #11AB4B; BLACK = (0, 0, 0); RIGHT = 541
+PRINT_GREEN = (17, 171, 75)  # Print version: #11AB4B
+BLACK = (0, 0, 0)
+RIGHT = 541
 SIG_P1 = (1213, 1534, 1497, 1819)
 SIG_P2 = (1232, 1535, 1517, 1819)
 
