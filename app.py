@@ -35,10 +35,13 @@ GREEN = (48, 177, 66)      # Background green (sampled from template)
 PRINT_GREEN = (48, 177, 66)  # Same background green for print version
 BLACK = (0, 0, 0)
 RIGHT = 541
-SIG_P1 = (1213, 1534, 1497, 1819)        # print mode: erase signature+line+name
-SIG_P2 = (1232, 1535, 1517, 1819)        # print mode: erase signature+line+name
-SIG_ONLY_P1 = (1213, 1534, 1497, 1733)  # digital: erase only cursive signature
-SIG_ONLY_P2 = (1232, 1535, 1517, 1738)  # digital: erase only cursive signature
+SIG_P1 = (1155, 1534, 1500, 1819)        # print mode: erase everything (sig+line+name)
+SIG_P2 = (1171, 1535, 1500, 1819)        # print mode: erase everything (sig+line+name)
+# Digital: erase full signature area (incl. tail below underline), then redraw underline
+SIG_ONLY_P1 = (1155, 1534, 1500, 1784)  # digital: erase signature strokes
+SIG_ONLY_P2 = (1171, 1535, 1500, 1793)  # digital: erase signature strokes
+SIG_LINE_P1 = (1189, 1735, 1500, 1738)  # the underline to redraw after erasing
+SIG_LINE_P2 = (1189, 1740, 1500, 1742)  # the underline to redraw after erasing
 
 NOOP_DATE = b"<00130016000F00110013000F00130011001300170001000E000100120013000F00110016000F0013001100130017>Tj"
 ENG_ERASE = [
@@ -85,8 +88,9 @@ def make_cert(name_eng, name_geo, course_eng, course_geo, date, crash, print_ver
     _g = PRINT_GREEN if print_version else GREEN
     d.rectangle([pt_to_px(120), pt_to_px(390), pt_to_px(548), pt_to_px(515)], fill=_g)
     d.rectangle([pt_to_px(55),  pt_to_px(642), pt_to_px(235), pt_to_px(666)], fill=_g)
-    d.rectangle(list(SIG_ONLY_P1), fill=_g)   # always erase cursive signature
-    if print_version: d.rectangle(list(SIG_P1), fill=_g)  # print: also erase line+name
+    d.rectangle(list(SIG_ONLY_P1), fill=_g)    # erase full signature (incl. tail below line)
+    d.rectangle(list(SIG_LINE_P1), fill=BLACK) # redraw the underline
+    if print_version: d.rectangle(list(SIG_P1), fill=_g)  # print: erase line+name too
     gr=pil_font("GeoReg",15); gb=pil_font("GeoBold",15)
     lr=pil_font("LatReg",12); lb=pil_font("LatBold",15); lh=pt_to_px(23)
     lp1 = pt_to_px(122)  # left edge of grid on page 1
@@ -105,8 +109,9 @@ def make_cert(name_eng, name_geo, course_eng, course_geo, date, crash, print_ver
     img2=imgs[1].copy(); d2=ImageDraw.Draw(img2)
     d2.rectangle([pt_to_px(200), pt_to_px(395), pt_to_px(548), pt_to_px(510)], fill=_g)
     d2.rectangle([pt_to_px(55),  pt_to_px(642), pt_to_px(235), pt_to_px(666)], fill=_g)
-    d2.rectangle(list(SIG_ONLY_P2), fill=_g)   # always erase cursive signature
-    if print_version: d2.rectangle(list(SIG_P2), fill=_g)  # print: also erase line+name
+    d2.rectangle(list(SIG_ONLY_P2), fill=_g)    # erase full signature (incl. tail below line)
+    d2.rectangle(list(SIG_LINE_P2), fill=BLACK) # redraw the underline
+    if print_version: d2.rectangle(list(SIG_P2), fill=_g)  # print: erase line+name too
     r19=pil_font("LatReg",19); b19=pil_font("LatBold",19); r12=pil_font("LatReg",12)
     off=int(19*DPI/72)
     lp2 = pt_to_px(202)  # left edge of grid on page 2
@@ -244,7 +249,7 @@ h1 { font-size: 1.6rem !important; font-weight: 700 !important; margin-bottom: 0
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="comm-header">' + logo_img_tag + '<br><br><h1>Certificate Generator</h1><p class="subtitle">commschool — generate personalized certificates in seconds</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="comm-header">' + logo_img_tag + '<br><br><h1>Certificate Generator</h1><p class="subtitle">commschool — generate personalized certificates in seconds &nbsp;·&nbsp; v17</p></div>', unsafe_allow_html=True)
 
 xlsx_file   = st.file_uploader("📊 Student List (Excel)", type=["xlsx"])
 course_type = st.radio("Course type", ["Regular course", "Crash course"], horizontal=True)
