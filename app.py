@@ -31,8 +31,8 @@ register_fonts()
 
 PAGE_W, PAGE_H = 595.276, 841.89
 DPI = 200; SCALE = DPI / 72.0
-GREEN = (5, 172, 76)       # Digital version: #05AC4C
-PRINT_GREEN = (17, 171, 75)  # Print version: #11AB4B
+GREEN = (48, 177, 66)      # Background green (sampled from template)
+PRINT_GREEN = (48, 177, 66)  # Same background green for print version
 BLACK = (0, 0, 0)
 RIGHT = 541
 SIG_P1 = (1213, 1534, 1497, 1819)
@@ -76,47 +76,72 @@ def make_cert(name_eng, name_geo, course_eng, course_geo, date, crash, print_ver
     img = imgs[0].copy(); d = ImageDraw.Draw(img)
     _g = PRINT_GREEN if print_version else GREEN
     d.rectangle([pt_to_px(120), pt_to_px(390), pt_to_px(548), pt_to_px(515)], fill=_g)
-    d.rectangle([pt_to_px(55),  pt_to_px(636), pt_to_px(235), pt_to_px(664)], fill=_g)
+    d.rectangle([pt_to_px(55),  pt_to_px(642), pt_to_px(235), pt_to_px(666)], fill=_g)
     if print_version: d.rectangle(list(SIG_P1), fill=_g)
     gr=pil_font("GeoReg",15); gb=pil_font("GeoBold",15)
     lr=pil_font("LatReg",12); lb=pil_font("LatBold",15); lh=pt_to_px(23)
-    y1=pt_to_px(400); y2=y1+lh; y3=y2+lh
-    draw_ra(d, y1, [("გადაეცემა ", gr), (name_geo, gb)], rp)
+    y1=pt_to_px(400); y2=y1+lh; y3=y2+lh; y4=y3+lh
+    # "გადაეცემა" label on its own line, student name on the next
+    draw_ra(d, y1, [("გადაეცემა", gr)], rp)
+    draw_ra(d, y2, [(name_geo, gb)], rp)
+    _geo_left_min = pt_to_px(55)
+    def _geo_fit(parts):
+        """Auto-shrink Georgian bold font if text would clip left margin."""
+        total = sum(ImageDraw.Draw(Image.new('RGB',(10,10))).textlength(t, font=f) for t, f in parts)
+        if rp - total >= _geo_left_min:
+            return parts
+        # Shrink the bold segments
+        _sz = 15
+        while _sz > 9:
+            _sz -= 1
+            _gb2 = pil_font("GeoBold", _sz); _lb2 = pil_font("LatBold", _sz)
+            shrunk = [(t, _gb2 if f is gb else (_lb2 if f is lb else f)) for t, f in parts]
+            total2 = sum(ImageDraw.Draw(Image.new('RGB',(10,10))).textlength(t, font=f) for t, f in shrunk)
+            if rp - total2 >= _geo_left_min:
+                return shrunk
+        return parts
     if crash:
-        draw_ra(d, y2, [('"', lb)]+mixed_parts(course_geo, gb, lb)+[('"', lb)], rp)
-        draw_ra(d, y3, [("ქრეშ კურსის წარმატებით დასრულებისთვის", gr)], rp)
+        draw_ra(d, y3, _geo_fit([('"', lb)]+mixed_parts(course_geo, gb, lb)+[('"', lb)]), rp)
+        draw_ra(d, y4, [("ქრეშ კურსის წარმატებით დასრულებისთვის", gr)], rp)
     else:
-        draw_ra(d, y2, mixed_parts(course_geo, gb, lb)+[(" პროგრამის", gr)], rp)
-        draw_ra(d, y3, [("წარმატებით დასრულებისთვის", gr)], rp)
+        draw_ra(d, y3, _geo_fit(mixed_parts(course_geo, gb, lb)+[(" პროგრამის", gr)]), rp)
+        draw_ra(d, y4, [("წარმატებით დასრულებისთვის", gr)], rp)
     d.text((pt_to_px(57.9), pt_to_px(644)), date, fill=BLACK, font=lr)
     writer.add_page(img_to_page(img))
     img2=imgs[1].copy(); d2=ImageDraw.Draw(img2)
     d2.rectangle([pt_to_px(200), pt_to_px(395), pt_to_px(548), pt_to_px(510)], fill=_g)
-    d2.rectangle([pt_to_px(55),  pt_to_px(636), pt_to_px(235), pt_to_px(664)], fill=_g)
+    d2.rectangle([pt_to_px(55),  pt_to_px(642), pt_to_px(235), pt_to_px(666)], fill=_g)
     if print_version: d2.rectangle(list(SIG_P2), fill=_g)
     r19=pil_font("LatReg",19); b19=pil_font("LatBold",19); r12=pil_font("LatReg",12)
     off=int(19*DPI/72)
     _tmp=Image.new("RGB",(10,10)); _td=ImageDraw.Draw(_tmp)
-    draw_ra(d2, pt_to_px(419)-off, [("Is presented to ", r19),(name_eng, b19)], rp)
-    draw_ra(d2, pt_to_px(441)-off, [("for successfully completing", r19)], rp)
+    # "Is presented to" label on its own line, student name on the next
+    draw_ra(d2, pt_to_px(419)-off, [("Is presented to", r19)], rp)
+    draw_ra(d2, pt_to_px(441)-off, [(name_eng, b19)], rp)
     if crash:
-        _w = _td.textlength('"'+course_eng+'"', font=b19)
-        if _td.textlength("the crash course", font=r19) + _w <= rp:
-            draw_ra(d2, pt_to_px(463)-off, [("the crash course", r19)], rp)
-            draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, b19),('"', r19)], rp)
-        else:
-            draw_ra(d2, pt_to_px(463)-off, [("the crash course", r19)], rp)
-            draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, b19),('"', r19)], rp)
+        draw_ra(d2, pt_to_px(463)-off, [("for successfully completing the crash course", r19)], rp)
+        _left_min = pt_to_px(55)
+        _b, _sz = b19, 19
+        while rp - _td.textlength('"'+course_eng+'"', font=_b) < _left_min and _sz > 11:
+            _sz -= 1; _b = pil_font("LatBold", _sz)
+        draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, _b),('"', r19)], rp)
     else:
-        _prefix_w = _td.textlength("the course of ", font=r19)
+        draw_ra(d2, pt_to_px(463)-off, [("for successfully completing the", r19)], rp)
+        _prefix_w = _td.textlength("course of ", font=r19)
         _course_w = _td.textlength(course_eng, font=b19)
-        if _prefix_w + _course_w <= rp:
-            # Fits on one line
-            draw_ra(d2, pt_to_px(463)-off, [("the course of ", r19),(course_eng, b19)], rp)
+        _left_min = pt_to_px(55)  # left margin boundary
+        if rp - (_prefix_w + _course_w) >= _left_min:
+            # Fits on one line without clipping left margin
+            draw_ra(d2, pt_to_px(485)-off, [("course of ", r19),(course_eng, b19)], rp)
         else:
-            # Split: "the course of" on line 3, course name on line 4
-            draw_ra(d2, pt_to_px(463)-off, [("the course of", r19)], rp)
-            draw_ra(d2, pt_to_px(485)-off, [(course_eng, b19)], rp)
+            # Split: "course of" on line 4, course name on line 5
+            draw_ra(d2, pt_to_px(485)-off, [("course of", r19)], rp)
+            # Auto-shrink course name font if still too wide
+            _b, _sz = b19, 19
+            while rp - _td.textlength(course_eng, font=_b) < _left_min and _sz > 11:
+                _sz -= 1
+                _b = pil_font("LatBold", _sz)
+            draw_ra(d2, pt_to_px(507)-off, [(course_eng, _b)], rp)
     d2.text((pt_to_px(58.4), pt_to_px(644)), date, fill=BLACK, font=r12)
     writer.add_page(img_to_page(img2))
     out=io.BytesIO(); writer.write(out); return out.getvalue()
@@ -142,14 +167,18 @@ def make_video(name_eng, name_geo, course_eng, course_geo, date, crash):
         eng_c2 = f"course of {course_eng}"
     def esc(s): return s.replace("\\", "\\\\").replace(":", "\:").replace(",", "\,").replace("'", "\\'")
     filters = [
-        f"drawtext=fontfile='{geo_bold}':text='{esc(name_geo)}':x=200:y=490:fontsize=30:fontcolor=black:enable='lte(t\\,0.2)+gte(t\\,3.8)'",
-        f"drawtext=fontfile='{lat_reg}':text='{esc(geo_c1)}':x=200:y=575:fontsize=23:fontcolor=black:enable='lte(t\\,0.2)+gte(t\\,3.8)'",
-        f"drawtext=fontfile='{geo_reg}':text='{esc(geo_c2)}':x=200:y=608:fontsize=23:fontcolor=black:enable='lte(t\\,0.2)+gte(t\\,3.8)'",
-        f"drawtext=fontfile='{lat_reg}':text='{esc(date)}':x=200:y=730:fontsize=19:fontcolor=black:enable='lte(t\\,0.2)+gte(t\\,3.8)'",
-        f"drawtext=fontfile='{lat_bold}':text='{esc(name_eng)}':x=375:y=505:fontsize=26:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
-        f"drawtext=fontfile='{lat_reg}':text='{esc(eng_c1)}':x=375:y=565:fontsize=21:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
-        f"drawtext=fontfile='{lat_reg}':text='{esc(eng_c2)}':x=375:y=593:fontsize=21:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
-        f"drawtext=fontfile='{lat_reg}':text='{esc(date)}':x=375:y=710:fontsize=18:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
+        # Georgian side (green card) — label, name, course ×2, date
+        f"drawtext=fontfile='{geo_reg}':text='გადაეცემა':x=309:y=470:fontsize=22:fontcolor=black:enable='lte(t\\,0.7)+gte(t\\,3.8)'",
+        f"drawtext=fontfile='{geo_bold}':text='{esc(name_geo)}':x=311:y=509:fontsize=28:fontcolor=black:enable='lte(t\\,0.7)+gte(t\\,3.8)'",
+        f"drawtext=fontfile='{lat_reg}':text='{esc(geo_c1)}':x=312:y=579:fontsize=22:fontcolor=black:enable='lte(t\\,0.7)+gte(t\\,3.8)'",
+        f"drawtext=fontfile='{geo_reg}':text='{esc(geo_c2)}':x=312:y=613:fontsize=22:fontcolor=black:enable='lte(t\\,0.7)+gte(t\\,3.8)'",
+        f"drawtext=fontfile='{lat_reg}':text='{esc(date)}':x=286:y=830:fontsize=17:fontcolor=black:enable='lte(t\\,0.7)+gte(t\\,3.8)'",
+        # English side (black card) — label, name, course ×2, date
+        f"drawtext=fontfile='{lat_reg}':text='Is presented to':x=382:y=478:fontsize=20:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
+        f"drawtext=fontfile='{lat_bold}':text='{esc(name_eng)}':x=375:y=508:fontsize=26:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
+        f"drawtext=fontfile='{lat_reg}':text='{esc(eng_c1)}':x=375:y=564:fontsize=21:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
+        f"drawtext=fontfile='{lat_reg}':text='{esc(eng_c2)}':x=375:y=596:fontsize=21:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
+        f"drawtext=fontfile='{lat_reg}':text='{esc(date)}':x=348:y=777:fontsize=17:fontcolor=0x30B143:enable='between(t\\,0.8\\,3.2)'",
     ]
     cmd = ["ffmpeg", "-i", in_path, "-vf", ",".join(filters),
            "-c:v", "libx264", "-crf", "20", "-preset", "fast", out_path, "-y"]
