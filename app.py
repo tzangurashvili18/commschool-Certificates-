@@ -35,8 +35,10 @@ GREEN = (48, 177, 66)      # Background green (sampled from template)
 PRINT_GREEN = (48, 177, 66)  # Same background green for print version
 BLACK = (0, 0, 0)
 RIGHT = 541
-SIG_P1 = (1213, 1534, 1497, 1819)
-SIG_P2 = (1232, 1535, 1517, 1819)
+SIG_P1 = (1213, 1534, 1497, 1819)        # print mode: erase signature+line+name
+SIG_P2 = (1232, 1535, 1517, 1819)        # print mode: erase signature+line+name
+SIG_ONLY_P1 = (1213, 1534, 1497, 1733)  # digital: erase only cursive signature
+SIG_ONLY_P2 = (1232, 1535, 1517, 1738)  # digital: erase only cursive signature
 
 NOOP_DATE = b"<00130016000F00110013000F00130011001300170001000E000100120013000F00110016000F0013001100130017>Tj"
 ENG_ERASE = [
@@ -63,6 +65,12 @@ def draw_ra(draw, y, parts, rp):
     for t, f in parts:
         draw.text((x, y), t, fill=BLACK, font=f); x += draw.textlength(t, font=f)
 
+def draw_la(draw, y, parts, lp):
+    """Left-align mixed-font text starting at lp."""
+    x = lp
+    for t, f in parts:
+        draw.text((x, y), t, fill=BLACK, font=f); x += draw.textlength(t, font=f)
+
 def img_to_page(img):
     b = io.BytesIO(); img.save(b, format="PNG"); b.seek(0)
     p = io.BytesIO(); c = canvas.Canvas(p, pagesize=(PAGE_W, PAGE_H))
@@ -77,71 +85,40 @@ def make_cert(name_eng, name_geo, course_eng, course_geo, date, crash, print_ver
     _g = PRINT_GREEN if print_version else GREEN
     d.rectangle([pt_to_px(120), pt_to_px(390), pt_to_px(548), pt_to_px(515)], fill=_g)
     d.rectangle([pt_to_px(55),  pt_to_px(642), pt_to_px(235), pt_to_px(666)], fill=_g)
-    if print_version: d.rectangle(list(SIG_P1), fill=_g)
+    d.rectangle(list(SIG_ONLY_P1), fill=_g)   # always erase cursive signature
+    if print_version: d.rectangle(list(SIG_P1), fill=_g)  # print: also erase line+name
     gr=pil_font("GeoReg",15); gb=pil_font("GeoBold",15)
     lr=pil_font("LatReg",12); lb=pil_font("LatBold",15); lh=pt_to_px(23)
+    lp1 = pt_to_px(122)  # left edge of grid on page 1
     y1=pt_to_px(400); y2=y1+lh; y3=y2+lh; y4=y3+lh
-    # "გადაეცემა" label on its own line, student name on the next
-    draw_ra(d, y1, [("გადაეცემა", gr)], rp)
-    draw_ra(d, y2, [(name_geo, gb)], rp)
-    _geo_left_min = pt_to_px(55)
-    def _geo_fit(parts):
-        """Auto-shrink Georgian bold font if text would clip left margin."""
-        total = sum(ImageDraw.Draw(Image.new('RGB',(10,10))).textlength(t, font=f) for t, f in parts)
-        if rp - total >= _geo_left_min:
-            return parts
-        # Shrink the bold segments
-        _sz = 15
-        while _sz > 9:
-            _sz -= 1
-            _gb2 = pil_font("GeoBold", _sz); _lb2 = pil_font("LatBold", _sz)
-            shrunk = [(t, _gb2 if f is gb else (_lb2 if f is lb else f)) for t, f in parts]
-            total2 = sum(ImageDraw.Draw(Image.new('RGB',(10,10))).textlength(t, font=f) for t, f in shrunk)
-            if rp - total2 >= _geo_left_min:
-                return shrunk
-        return parts
+    # Left-aligned: label, name, course ×2
+    draw_la(d, y1, [("გადაეცემა", gr)], lp1)
+    draw_la(d, y2, [(name_geo, gb)], lp1)
     if crash:
-        draw_ra(d, y3, _geo_fit([('"', lb)]+mixed_parts(course_geo, gb, lb)+[('"', lb)]), rp)
-        draw_ra(d, y4, [("ქრეშ კურსის წარმატებით დასრულებისთვის", gr)], rp)
+        draw_la(d, y3, [('"', lb)]+mixed_parts(course_geo, gb, lb)+[('"', lb)], lp1)
+        draw_la(d, y4, [("ქრეშ კურსის წარმატებით დასრულებისთვის", gr)], lp1)
     else:
-        draw_ra(d, y3, _geo_fit(mixed_parts(course_geo, gb, lb)+[(" პროგრამის", gr)]), rp)
-        draw_ra(d, y4, [("წარმატებით დასრულებისთვის", gr)], rp)
+        draw_la(d, y3, mixed_parts(course_geo, gb, lb)+[(" პროგრამის", gr)], lp1)
+        draw_la(d, y4, [("წარმატებით დასრულებისთვის", gr)], lp1)
     d.text((pt_to_px(57.9), pt_to_px(644)), date, fill=BLACK, font=lr)
     writer.add_page(img_to_page(img))
     img2=imgs[1].copy(); d2=ImageDraw.Draw(img2)
     d2.rectangle([pt_to_px(200), pt_to_px(395), pt_to_px(548), pt_to_px(510)], fill=_g)
     d2.rectangle([pt_to_px(55),  pt_to_px(642), pt_to_px(235), pt_to_px(666)], fill=_g)
-    if print_version: d2.rectangle(list(SIG_P2), fill=_g)
+    d2.rectangle(list(SIG_ONLY_P2), fill=_g)   # always erase cursive signature
+    if print_version: d2.rectangle(list(SIG_P2), fill=_g)  # print: also erase line+name
     r19=pil_font("LatReg",19); b19=pil_font("LatBold",19); r12=pil_font("LatReg",12)
     off=int(19*DPI/72)
-    _tmp=Image.new("RGB",(10,10)); _td=ImageDraw.Draw(_tmp)
-    # "Is presented to" label on its own line, student name on the next
-    draw_ra(d2, pt_to_px(419)-off, [("Is presented to", r19)], rp)
-    draw_ra(d2, pt_to_px(441)-off, [(name_eng, b19)], rp)
+    lp2 = pt_to_px(202)  # left edge of grid on page 2
+    # Left-aligned: label, name, course lines
+    draw_la(d2, pt_to_px(419)-off, [("Is presented to", r19)], lp2)
+    draw_la(d2, pt_to_px(441)-off, [(name_eng, b19)], lp2)
     if crash:
-        draw_ra(d2, pt_to_px(463)-off, [("for successfully completing the crash course", r19)], rp)
-        _left_min = pt_to_px(55)
-        _b, _sz = b19, 19
-        while rp - _td.textlength('"'+course_eng+'"', font=_b) < _left_min and _sz > 11:
-            _sz -= 1; _b = pil_font("LatBold", _sz)
-        draw_ra(d2, pt_to_px(485)-off, [('"', r19),(course_eng, _b),('"', r19)], rp)
+        draw_la(d2, pt_to_px(463)-off, [("for successfully completing the crash course", r19)], lp2)
+        draw_la(d2, pt_to_px(485)-off, [('"', r19),(course_eng, b19),('"', r19)], lp2)
     else:
-        draw_ra(d2, pt_to_px(463)-off, [("for successfully completing the", r19)], rp)
-        _prefix_w = _td.textlength("course of ", font=r19)
-        _course_w = _td.textlength(course_eng, font=b19)
-        _left_min = pt_to_px(55)  # left margin boundary
-        if rp - (_prefix_w + _course_w) >= _left_min:
-            # Fits on one line without clipping left margin
-            draw_ra(d2, pt_to_px(485)-off, [("course of ", r19),(course_eng, b19)], rp)
-        else:
-            # Split: "course of" on line 4, course name on line 5
-            draw_ra(d2, pt_to_px(485)-off, [("course of", r19)], rp)
-            # Auto-shrink course name font if still too wide
-            _b, _sz = b19, 19
-            while rp - _td.textlength(course_eng, font=_b) < _left_min and _sz > 11:
-                _sz -= 1
-                _b = pil_font("LatBold", _sz)
-            draw_ra(d2, pt_to_px(507)-off, [(course_eng, _b)], rp)
+        draw_la(d2, pt_to_px(463)-off, [("for successfully completing the", r19)], lp2)
+        draw_la(d2, pt_to_px(485)-off, [("course of ", r19),(course_eng, b19)], lp2)
     d2.text((pt_to_px(58.4), pt_to_px(644)), date, fill=BLACK, font=r12)
     writer.add_page(img_to_page(img2))
     out=io.BytesIO(); writer.write(out); return out.getvalue()
